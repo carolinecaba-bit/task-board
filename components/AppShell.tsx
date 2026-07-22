@@ -9,7 +9,13 @@ import { BoardView } from "./BoardView";
 
 const SIDEBAR_KEY = "task-board-sidebar-collapsed";
 
-export function AppShell({ userName }: { userName: string }) {
+export function AppShell({
+  userName,
+  roleByWorkspace,
+}: {
+  userName: string;
+  roleByWorkspace: Record<string, string>;
+}) {
   const t = useT();
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -227,6 +233,7 @@ export function AppShell({ userName }: { userName: string }) {
           onSelectBoard={setSelectedBoard}
           collapsed={collapsed}
           onToggleCollapsed={toggleCollapsed}
+          roleByWorkspace={roleByWorkspace}
         />
         <main className="flex-1 overflow-hidden">
           {error && (

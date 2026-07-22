@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
 
-// VULN(authn): route trusts getCurrentUser() unconditionally and never returns 401.
-// Students: reject unauthenticated requests with 401 before doing any work.
+// FIXED(authn): reject unauthenticated requests with 401 before doing any work.
 export async function GET() {
   const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // VULN(multitenancy): no workspace-membership check — any caller can read
   // any workspace's data. Students: verify getCurrentUser() is a member of

@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
 
-// VULN(authn): route trusts getCurrentUser() unconditionally and never returns 401.
-// Students: reject unauthenticated requests with 401 before doing any work.
+// FIXED(authn): reject unauthenticated requests with 401 before doing any work.
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await getCurrentUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id: boardId } = await params;
 
   // VULN(multitenancy): fetches tasks by boardId directly with no check that
@@ -24,13 +26,15 @@ export async function GET(
   return NextResponse.json({ tasks });
 }
 
-// VULN(authn): route trusts getCurrentUser() unconditionally and never returns 401.
-// Students: reject unauthenticated requests with 401 before doing any work.
+// FIXED(authn): reject unauthenticated requests with 401 before doing any work.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await getCurrentUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id: boardId } = await params;
   const body = await request.json();
   const title = typeof body.title === "string" ? body.title.trim() : "";

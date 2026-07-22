@@ -4,8 +4,7 @@ import { getCurrentUser } from "@/lib/current-user";
 
 const VALID_STATUSES = ["todo", "doing", "done"];
 
-// VULN(authn): route trusts getCurrentUser() unconditionally and never returns 401.
-// Students: reject unauthenticated requests with 401 before doing any work.
+// FIXED(authn): reject unauthenticated requests with 401 before doing any work.
 //
 // VULN(multitenancy) / IDOR: updates a task by id with no check that the
 // task's board belongs to a workspace the caller is a member of. Any caller
@@ -16,7 +15,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await getCurrentUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id: taskId } = await params;
   const body = await request.json();
 
@@ -42,8 +44,7 @@ export async function PATCH(
   return NextResponse.json({ task });
 }
 
-// VULN(authn): route trusts getCurrentUser() unconditionally and never returns 401.
-// Students: reject unauthenticated requests with 401 before doing any work.
+// FIXED(authn): reject unauthenticated requests with 401 before doing any work.
 //
 // VULN(multitenancy) / IDOR: deletes a task by id with no check that it
 // belongs to a workspace the caller is a member of. Students: verify
@@ -52,7 +53,10 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await getCurrentUser();
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id: taskId } = await params;
 
   await prisma.task.delete({ where: { id: taskId } });

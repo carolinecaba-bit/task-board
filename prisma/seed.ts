@@ -1,6 +1,11 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+// Dev-only seed password shared by every demo user — see README for how real
+// signup/password-reset would replace this.
+const SEED_PASSWORD = "password123";
 
 async function main() {
   // Clear existing data (SQLite dev database, safe to wipe on reseed).
@@ -10,14 +15,16 @@ async function main() {
   await prisma.workspace.deleteMany();
   await prisma.user.deleteMany();
 
+  const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
+
   const ana = await prisma.user.create({
-    data: { email: "ana@acme.test", name: "Ana" },
+    data: { email: "ana@acme.test", name: "Ana", passwordHash },
   });
   const beto = await prisma.user.create({
-    data: { email: "beto@acme.test", name: "Beto" },
+    data: { email: "beto@acme.test", name: "Beto", passwordHash },
   });
   const carla = await prisma.user.create({
-    data: { email: "carla@globex.test", name: "Carla" },
+    data: { email: "carla@globex.test", name: "Carla", passwordHash },
   });
 
   const acme = await prisma.workspace.create({ data: { name: "Acme" } });
@@ -129,10 +136,10 @@ async function main() {
   });
 
   console.log("\nSeed complete.\n");
-  console.log("Users:");
-  console.log(`  Ana   (${ana.email})  — owner of Acme`);
-  console.log(`  Beto  (${beto.email}) — member of Acme`);
-  console.log(`  Carla (${carla.email}) — owner of Globex`);
+  console.log("Users (all share the same password for local dev):");
+  console.log(`  Ana   (${ana.email})  — owner of Acme   — password: ${SEED_PASSWORD}`);
+  console.log(`  Beto  (${beto.email}) — member of Acme  — password: ${SEED_PASSWORD}`);
+  console.log(`  Carla (${carla.email}) — owner of Globex — password: ${SEED_PASSWORD}`);
   console.log("\nWorkspaces:");
   console.log(`  Acme   -> ${acme.id}`);
   console.log(`  Globex -> ${globex.id}`);

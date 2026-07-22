@@ -1,11 +1,19 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/context";
 import { ThemeToggle } from "./ThemeToggle";
 import { LangToggle } from "./LangToggle";
 
 export function TopBar({ userName }: { userName: string }) {
   const t = useT();
+  const router = useRouter();
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <header
@@ -32,6 +40,14 @@ export function TopBar({ userName }: { userName: string }) {
       <div className="flex items-center gap-2 shrink-0">
         <LangToggle />
         <ThemeToggle />
+        <button
+          type="button"
+          onClick={logout}
+          className="rounded-md px-2.5 py-1.5 text-xs font-medium hover:opacity-70"
+          style={{ color: "var(--muted)" }}
+        >
+          {t("banner.logout")}
+        </button>
       </div>
     </header>
   );

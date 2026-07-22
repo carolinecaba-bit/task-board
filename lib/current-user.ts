@@ -1,47 +1,32 @@
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { AUTH_COOKIE_NAME, verifySession } from "@/lib/jwt";
 
 /**
  * ============================================================================
- *  AUTH SEAM — THIS IS THE ONE PLACE REAL AUTHENTICATION PLUGS IN.
+ *  AUTH SEAM — real session/token lookup lives here now.
  * ============================================================================
  *
- * There is no login screen, no session, and no password anywhere in this
- * codebase. `getCurrentUser()` is a hardcoded stub: it always returns the
- * same user (Ana, from the "Acme" workspace) regardless of who is actually
- * making the request — there IS no "actually making the request", because
- * nothing here reads cookies, headers, or a session store.
+ * `getCurrentUser()` reads the `session` cookie set by `POST /api/auth/login`,
+ * verifies it as a JWT (see `lib/jwt.ts`), and loads the corresponding user
+ * from the database.
  *
- * Every route handler in `app/api/**` calls this function and trusts its
- * result unconditionally. That is `// VULN(authn)` at every call site: an
- * unauthenticated caller gets treated exactly like Ana, every time.
- *
- * Students: replace this function's internals with real session/token
- * lookup (NextAuth/Auth.js, Lucia, iron-session, your own JWT — your
- * choice). Concretely:
- *
- *   1. Read the session (cookie, header, whatever your auth library uses)
- *      from the incoming request.
- *   2. If there is no valid session, the CALLER (the route handler) must
- *      return 401 before doing any work — this function alone can't do
- *      that because it doesn't have access to the Response object.
- *   3. If there is a valid session, look up and return the real user it
- *      belongs to, instead of the hardcoded Ana record below.
- *
- * Do not just make this function "smarter" — the point is for every route
- * that calls it to also add an explicit unauthenticated check. Search the
- * codebase for `// VULN(authn)` to find every place that needs one.
+ * IMPORTANT: this function returns `null` for anonymous/invalid/expired
+ * sessions — it does NOT throw and does NOT fall back to a hardcoded user.
+ * Every route handler under `app/api/**` MUST check for `null` and return
+ * `401 Unauthorized` itself before touching the database; this function has
+ * no access to the Response object, so it can't do that on the caller's
+ * behalf.
  * ============================================================================
  */
 export async function getCurrentUser() {
-  const user = await prisma.user.findUnique({
-    where: { email: "ana@acme.test" },
-  });
+  const cookieStore = await cookies();
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+  if (!token) return null;
 
-  if (!user) {
-    throw new Error(
-      "Dev stub user not found — did you run `npm run seed`? getCurrentUser() expects ana@acme.test to exist."
-    );
-  }
+  const session = verifySession(token);
+  if (!session) return null;
 
+  const user = await prisma.user.findUnique({ where: { id: session.sub } });
   return user;
 }

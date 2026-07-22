@@ -2,14 +2,37 @@
 
 A Trello-lite team task board built with **Next.js (App Router)**, **Prisma**, and
 **SQLite**. It's a fully working app — boards, drag-and-drop cards, light/dark theme,
-EN/ES UI — with one deliberate catch: **it ships with no authentication and no
-multitenancy**. Those are the two things you'll build in this module.
+EN/ES UI.
+
+> Status on this branch (`feat/jwt-auth-users`): **AuthN is implemented** (real
+> login, JWT session cookie, 401s on every protected route). **Multitenancy and
+> the board-delete AuthZ check are still open** — see
+> [`VULN_MAP.md`](./VULN_MAP.md); they're the subject of a follow-up branch/PR.
+
+## Auth & Users (this branch)
+
+- **Login** — email + password, `POST /api/auth/login`. Passwords are hashed with
+  bcrypt (`passwordHash` on `User`). On success, a JWT is signed
+  (`lib/jwt.ts`) and set as an httpOnly cookie (`session`).
+- **`getCurrentUser()`** (`lib/current-user.ts`) now reads that cookie and
+  returns the real signed-in user, or `null` for anyone without a valid
+  session — every route under `app/api/**` checks for `null` and returns
+  `401` before touching the database.
+- **Login screen** at `/login` (`app/login/page.tsx` + `components/LoginForm.tsx`);
+  `app/page.tsx` redirects there when signed out. `TopBar` shows the real user
+  and a logout button.
+- **Users section** — any workspace **owner** gets a ⚙ button next to that
+  workspace's name in the sidebar, opening a panel
+  (`components/MembersModal.tsx`) to add a user (creating the account with a
+  generated temporary password if it doesn't exist yet), change a member's
+  role (`owner`/`member`), or remove them — backed by
+  `POST/PATCH/DELETE /api/workspaces/[id]/members[/[userId]]`, all
+  owner-gated. A workspace always keeps at least one owner.
+- **Seed accounts** (see "Running it" below) all share the password
+  `password123` for local dev.
 
 ## What's actually missing
 
-- **AuthN** — there's no login screen, no session, no password anywhere. Every
-  request is treated as the same hardcoded user (Ana), defined in
-  `lib/current-user.ts`.
 - **Multitenancy** — the database has two workspaces ("Acme" and "Globex") that
   share nothing, but every API route queries by `workspaceId` / `boardId` directly
   with **no check** that the current user actually belongs to that workspace. Any
@@ -29,8 +52,9 @@ for the assignment that walks you through fixing all of it.
 - Tailwind CSS, themed through CSS variables (light/dark/system)
 - A small hand-rolled i18n dictionary (`es` default, `en` toggle in the top bar)
 
-No auth library, no NextAuth/Auth.js, no JWT — that's on purpose. Pick whatever
-approach you want for the exercise.
+No auth library (NextAuth/Auth.js, Lucia, etc.) — this branch hand-rolls a
+minimal JWT-in-httpOnly-cookie session with `jsonwebtoken` + `bcryptjs`
+instead. See "Auth & Users" above for why.
 
 ## Running it
 
@@ -41,18 +65,23 @@ npm run seed              # wipes and reseeds demo data, prints workspace IDs
 npm run dev                # http://localhost:3000
 ```
 
-The dev server needs Node 18.18+ (Next.js requirement).
+The dev server needs Node 18.18+ (Next.js requirement). Optionally set
+`JWT_SECRET` in your environment before starting the server — without it,
+`lib/jwt.ts` falls back to an obviously-fake dev secret (fine for local dev,
+**never for anything deployed**).
 
 ### Seed data
 
 - **Users:** Ana (`ana@acme.test`), Beto (`beto@acme.test`), Carla (`carla@globex.test`)
+  — **password `password123` for all three**
 - **Workspaces:** Acme, Globex — **nobody belongs to both**
 - **Memberships:** Ana = owner of Acme · Beto = member of Acme · Carla = owner of Globex
 - Each workspace has 2 boards with 3–4 tasks each, mixed statuses, a couple of
   Spanish task titles mixed in
 
-The dev-stub user (`getCurrentUser()`) is always **Ana**, an Acme-only user. Run
-`npm run seed` again any time to reset the database and reprint fresh workspace IDs.
+Log in as Ana to see the ⚙ "manage users" button on Acme (she's its owner); Beto
+won't see it on Acme (member, not owner). Run `npm run seed` again any time to
+reset the database and reprint fresh workspace IDs.
 
 ## Try the vulnerability
 

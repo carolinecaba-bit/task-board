@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useT } from "@/lib/i18n/context";
 import type { Board, Workspace } from "@/lib/types";
+import { MembersModal } from "./MembersModal";
 
 export function Sidebar({
   workspaces,
@@ -11,6 +12,7 @@ export function Sidebar({
   onSelectBoard,
   collapsed,
   onToggleCollapsed,
+  roleByWorkspace,
 }: {
   workspaces: Workspace[];
   boardsByWorkspace: Record<string, Board[]>;
@@ -18,6 +20,7 @@ export function Sidebar({
   onSelectBoard: (board: Board) => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  roleByWorkspace: Record<string, string>;
 }) {
   const t = useT();
 
@@ -72,6 +75,7 @@ export function Sidebar({
             boards={boardsByWorkspace[ws.id] ?? []}
             selectedBoardId={selectedBoardId}
             onSelectBoard={onSelectBoard}
+            isOwner={roleByWorkspace[ws.id] === "owner"}
           />
         ))}
       </div>
@@ -84,30 +88,48 @@ function WorkspaceGroup({
   boards,
   selectedBoardId,
   onSelectBoard,
+  isOwner,
 }: {
   workspace: Workspace;
   boards: Board[];
   selectedBoardId: string | null;
   onSelectBoard: (board: Board) => void;
+  isOwner: boolean;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(true);
+  const [managingUsers, setManagingUsers] = useState(false);
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[13px] font-semibold hover:opacity-80"
-      >
-        <span
-          className="text-[10px] transition-transform"
-          style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
-          aria-hidden
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex flex-1 min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-left text-[13px] font-semibold hover:opacity-80"
         >
-          ▸
-        </span>
-        {workspace.name}
-      </button>
+          <span
+            className="text-[10px] transition-transform"
+            style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+            aria-hidden
+          >
+            ▸
+          </span>
+          <span className="truncate">{workspace.name}</span>
+        </button>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => setManagingUsers(true)}
+            title={t("members.manage")}
+            aria-label={t("members.manage")}
+            className="shrink-0 rounded-md px-1.5 py-1 text-[12px] hover:opacity-70"
+            style={{ color: "var(--muted)" }}
+          >
+            ⚙
+          </button>
+        )}
+      </div>
       {open && (
         <ul className="mt-0.5 flex flex-col gap-0.5 pl-4">
           {boards.map((board) => {
@@ -130,6 +152,13 @@ function WorkspaceGroup({
             );
           })}
         </ul>
+      )}
+      {managingUsers && (
+        <MembersModal
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          onClose={() => setManagingUsers(false)}
+        />
       )}
     </div>
   );

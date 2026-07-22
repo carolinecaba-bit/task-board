@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  memberships  Membership[]
+  tasks        Task[]       @relation("AssignedTasks")
+
+  createdAt    DateTime     @default(now())
+}
+
+model Workspace {
+  id          String       @id @default(cuid())
+  name        String
+  memberships Membership[]
+  boards      Board[]
+
+  createdAt   DateTime     @default(now())
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  role        String // "owner" | "member"
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, workspaceId])
+}
+
+model Board {
+  id          String    @id @default(cuid())
+  name        String
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId String
+
+  tasks       Task[]
+
+  createdAt   DateTime  @default(now())
+}
+
+model Task {
+  id         String   @id @default(cuid())
+  title      String
+  status     String   @default("todo") // "todo" | "doing" | "done"
+
+  board      Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  boardId    String
+
+  assignee   User?    @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigneeId String?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

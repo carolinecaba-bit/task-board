@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
+import { isWorkspaceMember } from "@/lib/tenant";
 
 // FIXED(authn): reject unauthenticated requests with 401 before doing any work.
 export async function GET(
@@ -13,11 +14,13 @@ export async function GET(
   }
   const { id: workspaceId } = await params;
 
-  // VULN(multitenancy): fetches boards by workspaceId directly with no
-  // membership check — any caller can list any workspace's boards, even one
-  // they've never belonged to. Students: verify getCurrentUser() has a
-  // Membership row for this workspaceId before querying, and return
-  // 404/403 otherwise.
+  // FIXED(multitenancy): 404 (not 403) if the caller isn't a member of this
+  // workspace, so the response doesn't confirm the workspace exists to
+  // someone who has no business knowing that.
+  if (!(await isWorkspaceMember(user.id, workspaceId))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const boards = await prisma.board.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "asc" },

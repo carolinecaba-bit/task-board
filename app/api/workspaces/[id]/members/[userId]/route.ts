@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
+import { getMembership } from "@/lib/tenant";
 
 const VALID_ROLES = ["owner", "member"];
 
 async function requireOwner(userId: string, workspaceId: string) {
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId, workspaceId } },
-  });
+  const membership = await getMembership(userId, workspaceId);
   return membership?.role === "owner";
 }
 
@@ -41,9 +40,7 @@ export async function PATCH(
     );
   }
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
-  });
+  const membership = await getMembership(targetUserId, workspaceId);
   if (!membership) {
     return NextResponse.json({ error: "Not a member" }, { status: 404 });
   }
@@ -98,9 +95,7 @@ export async function DELETE(
     );
   }
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId: targetUserId, workspaceId } },
-  });
+  const membership = await getMembership(targetUserId, workspaceId);
   if (!membership) {
     return NextResponse.json({ error: "Not a member" }, { status: 404 });
   }

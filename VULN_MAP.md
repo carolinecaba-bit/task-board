@@ -1,5 +1,7 @@
 # VULN_MAP
 
+> **Status: every marker below is fixed** as of `feat/multitenancy` (built on `feat/jwt-auth-users`). Kept here as historical reference for the exercise in `EXERCISE.md` — search the referenced files for `FIXED(...)` comments explaining each fix, or see `lib/tenant.ts` / `lib/current-user.ts`.
+
 Every `// VULN(...)` marker in the codebase, where it lives, and which slide concept
 it maps to. Use this as a checklist alongside [`EXERCISE.md`](./EXERCISE.md).
 

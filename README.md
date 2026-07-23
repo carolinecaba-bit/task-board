@@ -4,10 +4,9 @@ A Trello-lite team task board built with **Next.js (App Router)**, **Prisma**, a
 **SQLite**. It's a fully working app — boards, drag-and-drop cards, light/dark theme,
 EN/ES UI.
 
-> Status on this branch (`feat/jwt-auth-users`): **AuthN is implemented** (real
-> login, JWT session cookie, 401s on every protected route). **Multitenancy and
-> the board-delete AuthZ check are still open** — see
-> [`VULN_MAP.md`](./VULN_MAP.md); they're the subject of a follow-up branch/PR.
+> Status: **AuthN, multitenancy, and the board-delete AuthZ check are all
+> implemented** — see [`VULN_MAP.md`](./VULN_MAP.md), every marker there is
+> now fixed. This branch (`feat/multitenancy`) builds on `feat/jwt-auth-users`.
 
 ## Auth & Users (this branch)
 
@@ -31,18 +30,26 @@ EN/ES UI.
 - **Seed accounts** (see "Running it" below) all share the password
   `password123` for local dev.
 
-## What's actually missing
+## Multitenancy & AuthZ (this branch)
 
-- **Multitenancy** — the database has two workspaces ("Acme" and "Globex") that
-  share nothing, but every API route queries by `workspaceId` / `boardId` directly
-  with **no check** that the current user actually belongs to that workspace. Any
-  user can read or write any workspace's data.
-- **AuthZ** — a couple of actions (deleting a board) are meant to be owner-only, but
-  there's no role check anywhere, so any member can do them.
+- **`lib/tenant.ts`** centralizes the two things every multitenancy check
+  needs: resolving a Board/Task id up to its `workspaceId`
+  (`getBoardWorkspaceId`, `getTaskWorkspaceId` — the latter walks
+  `task -> board -> workspaceId`, since a task id alone doesn't carry its
+  workspace), and checking whether the current user has a `Membership` row
+  there (`getMembership`, `isWorkspaceMember`).
+- Every route that used to trust a `workspaceId`/`boardId`/`taskId` straight
+  from the URL now runs that check first and returns **404** (not 403) if
+  the caller isn't a member — so the response doesn't confirm the resource
+  exists to someone with no business knowing that.
+- `GET /api/workspaces` now filters to workspaces the caller actually
+  belongs to, instead of returning all of them.
+- `DELETE /api/boards/[id]` is owner-only again: 404 if you're not a member
+  of the board's workspace, 403 if you are a member but not an `owner`.
 
-Every place this matters is marked in the code with a `// VULN(...)` comment. See
-[`VULN_MAP.md`](./VULN_MAP.md) for the full list, and [`EXERCISE.md`](./EXERCISE.md)
-for the assignment that walks you through fixing all of it.
+This closes every `// VULN(...)` marker originally listed in
+[`VULN_MAP.md`](./VULN_MAP.md) (kept in the repo as historical reference —
+see [`EXERCISE.md`](./EXERCISE.md) for the assignment they came from).
 
 ## Stack
 

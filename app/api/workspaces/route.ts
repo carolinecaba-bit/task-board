@@ -9,12 +9,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // VULN(multitenancy): no workspace-membership check — any caller can read
-  // any workspace's data. Students: verify getCurrentUser() is a member of
-  // this workspace before querying, and return 404/403 otherwise. Here that
-  // means filtering to only workspaces the user has a Membership row for,
-  // e.g. `prisma.workspace.findMany({ where: { memberships: { some: { userId: user.id } } } })`.
+  // FIXED(multitenancy): only return workspaces the current user has a
+  // Membership row for, instead of every workspace in the database.
   const workspaces = await prisma.workspace.findMany({
+    where: { memberships: { some: { userId: user.id } } },
     orderBy: { name: "asc" },
   });
 

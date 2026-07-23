@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
+import { getBoardWorkspaceId, isWorkspaceMember } from "@/lib/tenant";
 
 // FIXED(authn): reject unauthenticated requests with 401 before doing any work.
 export async function GET(
@@ -13,10 +14,14 @@ export async function GET(
   }
   const { id: boardId } = await params;
 
-  // VULN(multitenancy): fetches tasks by boardId directly with no check that
-  // the board belongs to a workspace the caller is a member of. Students:
-  // look up the board's workspaceId, verify getCurrentUser() is a member of
-  // it, and return 404/403 otherwise.
+  // FIXED(multitenancy): resolve the board's workspace and confirm the
+  // caller is a member before listing its tasks. 404 either way (unknown
+  // board vs. board in a workspace the caller isn't in look identical).
+  const workspaceId = await getBoardWorkspaceId(boardId);
+  if (!workspaceId || !(await isWorkspaceMember(user.id, workspaceId))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const tasks = await prisma.task.findMany({
     where: { boardId },
     include: { assignee: true },
@@ -36,6 +41,14 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id: boardId } = await params;
+
+  // FIXED(multitenancy): same board -> workspace -> membership check before
+  // allowing a write, not just reads.
+  const workspaceId = await getBoardWorkspaceId(boardId);
+  if (!workspaceId || !(await isWorkspaceMember(user.id, workspaceId))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const body = await request.json();
   const title = typeof body.title === "string" ? body.title.trim() : "";
 
@@ -43,9 +56,6 @@ export async function POST(
     return NextResponse.json({ error: "Title is required" }, { status: 400 });
   }
 
-  // VULN(multitenancy): creates a task on any boardId with no check that the
-  // board belongs to a workspace the caller is a member of. Students: verify
-  // membership on the board's workspace before writing.
   const task = await prisma.task.create({
     data: {
       title,

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
+import { getMembership, isWorkspaceMember } from "@/lib/tenant";
 
 const VALID_ROLES = ["owner", "member"];
 
@@ -17,12 +18,12 @@ export async function GET(
   }
   const { id: workspaceId } = await params;
 
-  // VULN(multitenancy): fetches memberships by workspaceId directly with no
-  // check that the caller belongs to this workspace. Used by the UI to
-  // populate the assignee dropdown, but it just as happily leaks the full
-  // member list of a workspace the caller isn't in. Students: verify
-  // membership before querying. (Left for the Part 2 PR, along with the
-  // other read-path VULN(multitenancy) markers.)
+  // FIXED(multitenancy): 404 if the caller isn't a member of this workspace
+  // — this endpoint used to hand out any workspace's full member list.
+  if (!(await isWorkspaceMember(user.id, workspaceId))) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const memberships = await prisma.membership.findMany({
     where: { workspaceId },
     include: { user: true },
@@ -42,13 +43,9 @@ export async function GET(
 /**
  * Users/roles management — add a member to this workspace.
  *
- * This is a brand-new endpoint (not one of the original VULN(...) markers),
- * so unlike the GET above it ships here with its authorization check
- * already in place: only an existing "owner" of this workspace may call it.
- * If the email doesn't match an existing user, a new account is created
- * with a randomly generated temporary password (returned once in the
- * response — there's no email/SMTP in this exercise to deliver it any
- * other way).
+ * Already owner-gated since it shipped on the auth branch (not one of the
+ * original VULN(...) markers). Left as-is here, just reusing the shared
+ * `getMembership` helper from lib/tenant.ts instead of an inline query.
  */
 export async function POST(
   request: Request,
@@ -60,9 +57,7 @@ export async function POST(
   }
   const { id: workspaceId } = await params;
 
-  const requesterMembership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId: user.id, workspaceId } },
-  });
+  const requesterMembership = await getMembership(user.id, workspaceId);
   if (!requesterMembership || requesterMembership.role !== "owner") {
     return NextResponse.json(
       { error: "Only workspace owners can manage members" },
@@ -100,9 +95,7 @@ export async function POST(
     });
   }
 
-  const existingMembership = await prisma.membership.findUnique({
-    where: { userId_workspaceId: { userId: targetUser.id, workspaceId } },
-  });
+  const existingMembership = await getMembership(targetUser.id, workspaceId);
   if (existingMembership) {
     return NextResponse.json(
       { error: "User is already a member of this workspace" },
